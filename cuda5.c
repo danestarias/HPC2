@@ -8,7 +8,7 @@
 
 
 __global__ void vecAdd(float *A, float *B, float *C, int n){
-	int i=blockIdx.x*blockDim.x+threadIdx.x; // a*b+c -- a->id del bloque utilizado
+	int i=blockIdx.x*blockDim.x+threadIdx.x; 												// a*b+c -- a->id del bloque utilizado
 	if(i<n){
 		C[i]=A[i]+B[i];
 	}
@@ -18,25 +18,25 @@ __global__ void vecAdd(float *A, float *B, float *C, int n){
 void vectorAdd(int *A, int *B, int *C, int n){
 	int size= n*sizeof(int);
 	float *d_A, *d_B, *d_C;
-	cudaMalloc((void **)&d_A,size);							//reserva memoria en el device
+	cudaMalloc((void **)&d_A,size);															//reserva memoria en el device
 	cudaMalloc((void **)&d_B,size);
 	cudaMalloc((void **)&d_C,size);
   
   	clock_t t2;
   	t2 = clock();
 
-	cudaMemcpy( d_A, A, size, cudaMemcpyHostToDevice);		//se copian al device
+	cudaMemcpy( d_A, A, size, cudaMemcpyHostToDevice);										//se copian al device
 	cudaMemcpy( d_B, B, size, cudaMemcpyHostToDevice);
 
-	float dimGrid= ceil(n/blockSize);
+	float dimGrid= ceil((float)n/(float)blockSize);
 
-	vecAdd<<< dimGrid, n >>>(d_A, d_B, d_C, n);					//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
+	vecAdd<<< dimGrid, n >>>(d_A, d_B, d_C, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
 	cudaMemcpy( C,d_C, size, cudaMemcpyDeviceToHost);
   
   	t2 = clock() - t2;
   	printf ("\nTiempo desde la GPU: (%f seconds).\n",((float)t2)/CLOCKS_PER_SEC);
 
-	cudaFree(d_A);											//libera memoria del dispositivo
+	cudaFree(d_A);																			//libera memoria del dispositivo
 	cudaFree(d_B);
 	cudaFree(d_C);
 
