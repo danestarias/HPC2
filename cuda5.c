@@ -43,7 +43,7 @@ void vectorAdd(int *A, int *B, int *C, int n){
 }
 
 
-int * sumar(int *A, int *B, int *C, int n){
+void sumar(int *A, int *B, int *C, int n){
  	clock_t t;
    	t = clock();
    
@@ -55,7 +55,6 @@ int * sumar(int *A, int *B, int *C, int n){
    	t = clock() - t;
   	printf ("Tiempo desde la CPU: (%f seconds).\n",((float)t)/CLOCKS_PER_SEC);
    
-   	return C;
 }
     
 
