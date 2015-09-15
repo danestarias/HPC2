@@ -8,20 +8,11 @@
 
 
 __global__ void MatrixSumKernel(float *d_M, float *d_N, float *d_P, int Width){
-	
 	int Row = blockIdx.y*blockDim.y+threadIdx.y;
-
 	// Calculate the coumn index of d_Pelement and d_M
 	int Col = blockIdx.x*blockDim.x+threadIdx.x;
-
 	if((Row < Width) && (Col < Width)){
-		float Pvalue = 0;
-		// each thread computes one element of the block sub-matrix
-		for (int k=0;k < Width;++k){
-			Pvalue += d_M[Row*Width+k]+d_N[k*Width+Col];
-		}
-		d_P[Row*Width+Col] = Pvalue;
-
+    	d_P[Row*Width+Col] = d_M[Row*Width+Col]+d_N[Row*Width+Col];
 	}
 
 }
@@ -45,7 +36,14 @@ void vectorAdd(int *A, int *B, int *C, int n){
 
 	MatrixSumKernel<<< dimGrid, n >>>(d_A, d_B, d_C, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
 	cudaMemcpy( C,d_C, size, cudaMemcpyDeviceToHost);
-  
+  /*
+  printf("Resultados de la gpu");
+  for(int fil=0;fil<n;fil++){
+		for(int col=0;col<n;col++){
+      printf("%d",C[fil*n+col]);
+    }
+    printf("\n");
+  }*/
   	t2 = clock() - t2;
   	printf ("\nTiempo desde la GPU: (%f seconds).\n",((float)t2)/CLOCKS_PER_SEC);
 
@@ -62,9 +60,9 @@ void sumar(int *A, int *B, int *C, int filas, int columnas){
    	for(int fil=0;fil<filas;fil++){
 		for(int col=0;col<columnas;col++){
      		C[fil*columnas+col]= A[fil*columnas+col] + B[fil*columnas+col];
-     		printf("%d",C[fil*columnas+col]);
+     		//printf("%d",C[fil*columnas+col]);
      	}
-     	printf("\n");
+     	//printf("\n");
 
    	}
    
