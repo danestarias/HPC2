@@ -3,11 +3,12 @@
 #include <cuda.h>
 #include <cstdlib>
 #include <time.h>
-#define TAM 64
+
+#define TAM 200
 #define blockSize 1024
 
 
-__global__ void MatrixMulKernel(float *d_M, float *d_N, float *d_P, int Width){
+__global__ void MatrixMulKernel(int *d_M, int *d_N, int *d_P, int Width){
 	
 	int Row = blockIdx.y*blockDim.y+threadIdx.y;
 
@@ -15,12 +16,12 @@ __global__ void MatrixMulKernel(float *d_M, float *d_N, float *d_P, int Width){
 	int Col = blockIdx.x*blockDim.x+threadIdx.x;
 
 	if((Row < Width) && (Col < Width)){
-		float Pvalue = 0;
+		int Pvalue = 0;
 		for (int k=0;k < Width;k++){
 			Pvalue += d_M[Row*Width+k]*d_N[k*Width+Col];
 		}
 		d_P[Row*Width+Col] = Pvalue;
-
+		//printf("-> %d",Pvalue);
 	}
 
 }
@@ -28,8 +29,8 @@ __global__ void MatrixMulKernel(float *d_M, float *d_N, float *d_P, int Width){
 
 
 void vectorAdd(int *A, int *B, int *C, int n){
-	int size= n*sizeof(int);
-	float *d_A, *d_B, *d_C;
+	int size= n*n*sizeof(int);
+	int *d_A, *d_B, *d_C;
 	cudaMalloc((void **)&d_A,size);															//reserva memoria en el device
 	cudaMalloc((void **)&d_B,size);
 	cudaMalloc((void **)&d_C,size);
@@ -40,27 +41,36 @@ void vectorAdd(int *A, int *B, int *C, int n){
 	cudaMemcpy( d_A, A, size, cudaMemcpyHostToDevice);										//se copian al device
 	cudaMemcpy( d_B, B, size, cudaMemcpyHostToDevice);
 
-	//float dimGrida= ceil((float)n/(float)blockSize);
+	float dimGrida= ceil((float)n/(float)blockSize);
 
 	//float dimBlockx=ceil((float)n/(float)blockSize);
 
 	//dim3 dimBlock(32,32); //hilos por bloque que voy a lanzar para matriz de 64*64
 
-	dim3 dimBlock(ceil((float)n/(float)blockSize),ceil((float)n/(float)blockSize));
-	dim3 dimGrid(dimBlock.x,dimBlock.y);
+	dim3 dimBlock(1,1,1);
+  	dim3 dimGrid(ceil(n/dimBlock.x),ceil(n/dimBlock.y),1);
 
-	MatrixMulKernel<<< dimBlock, dimGrid >>>(d_A, d_B, d_C, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
+
+
+	MatrixMulKernel<<< dimGrid, dimBlock >>>(d_A, d_B, d_C, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
 	cudaMemcpy( C,d_C, size, cudaMemcpyDeviceToHost);
-  
+  int entre=0;
   	t2 = clock() - t2;
-
   	printf("\nResultados de la gpu\n");
 	for(int fil=0;fil<n;fil++){
 		for(int col=0;col<n;col++){
-	    	printf("%d",C[fil*n+col]);
+	    	printf("%d ",C[fil*n+col]);
+      if(C[fil*n+col] ==n){
+        entre++;
+      }
+      	
 	    }
 	    printf("\n");
 	}
+  printf("entre -> %d veces ",entre);
+  /*for(int fil=0;fil<n*n;fil++){
+	    printf("%d ",C[fil]);
+	}*/
   	printf ("\nTiempo desde la GPU: (%f seconds).\n",((float)t2)/CLOCKS_PER_SEC);
 
 	cudaFree(d_A);																			//libera memoria del dispositivo
@@ -93,11 +103,10 @@ void multiplicar(int *A, int *B, int *C, int filas, int columnas){
     
 
 int main(){
-	int n; //longitud del vector
 	int * A;
 	int * B;
 	int * C;
-  	n=TAM;
+  int	n=TAM;
   	int filas=n;
   	int columnas=n;
 
@@ -111,10 +120,17 @@ int main(){
 			B[fil*columnas+col]=1;
 		}
 	}
+  
+  
 
 	//vecAddGPU(A,B,C);
   	//multiplicar(A,B,C,filas,columnas);
   	vectorAdd(A,B,C,n);
+  
+  free(A);
+  free(B);
+  free(C);
+
 
 	return 0;
 }
