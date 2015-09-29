@@ -91,10 +91,10 @@ void multiplicar(int *A, int *B, int *C, int filas, int columnas){
 	     	}
 	     	C[it]= acomulado;
 	   	}	
-	    /*printf("%d",C[it]);
+	    printf("%d",C[it]);
 	    if(((it+1)%filas)==0){
 	     	printf("\n");
-	    }*/
+	    }
 	   	
    	}
    	t = clock() - t;
@@ -116,16 +116,15 @@ int main(){
 
 	for(int fil=0;fil<filas;fil++){
 		for(int col=0;col<columnas;col++){
-			A[fil*columnas+col]=1;
-			B[fil*columnas+col]=1;
+			A[fil*columnas+col]=rand() % 10;
+			B[fil*columnas+col]=rand() % 10;
 		}
 	}
   
   
 
-	//vecAddGPU(A,B,C);
-  	//multiplicar(A,B,C,filas,columnas);
-  	vectorAdd(A,B,C,n);
+  	multiplicar(A,B,C,filas,columnas);
+  	//vectorAdd(A,B,C,n);
   
   free(A);
   free(B);
