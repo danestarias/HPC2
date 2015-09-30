@@ -8,7 +8,7 @@
 #define blockSize 1024
 #define TILE_WIDTH 25
 
-__global__ void MatrixMulKernel(int *d_M, int *d_N, int *d_P, int Width){
+__global__ void MatrixMulKernelShared(int *d_M, int *d_N, int *d_P, int Width){
 
 	__shared__ float Mds[TILE_WIDTH][TILE_WIDTH];
 	__shared__ float Nds[TILE_WIDTH][TILE_WIDTH];
@@ -37,7 +37,6 @@ __global__ void MatrixMulKernel(int *d_M, int *d_N, int *d_P, int Width){
 	d_P[Row*Width + Col] = Pvalue;
 }
 
-/*
 
 __global__ void MatrixMulKernel(int *d_M, int *d_N, int *d_P, int Width){
 	
@@ -55,14 +54,16 @@ __global__ void MatrixMulKernel(int *d_M, int *d_N, int *d_P, int Width){
 	}
 
 }
-*/
 
-void vectorAdd(int *A, int *B, int *CK, int n){
+
+void vectorAdd(int *A, int *B, int *CK, int *CKS, int n){
 	int size= n*n*sizeof(int);
-	int *d_A, *d_B, *d_C;
+	int *d_A, *d_B, *d_C, *d_CKS;
 	cudaMalloc((void **)&d_A,size);															//reserva memoria en el device
 	cudaMalloc((void **)&d_B,size);
 	cudaMalloc((void **)&d_C,size);
+	cudaMalloc((void **)&d_CKS,size);
+
 
 	int numBlock=32;
 	while(n%numBlock!=0){
@@ -71,24 +72,33 @@ void vectorAdd(int *A, int *B, int *CK, int n){
 	printf("numero de bloques -> %d \n",numBlock);
   
   	clock_t t2;
-  	t2 = clock();
-
+  	t2 = clock();	//tiempo de asignacion de memoria
 	cudaMemcpy( d_A, A, size, cudaMemcpyHostToDevice);										//se copian al device
 	cudaMemcpy( d_B, B, size, cudaMemcpyHostToDevice);
 
 	dim3 dimBlock(numBlock,numBlock,1); 		//->30 hx 30 hy ->900 hilos ->100 bloques (bloques en X y Y?)
   	dim3 dimGrid(ceil(n/dimBlock.x),ceil(n/dimBlock.y),1);	//100 bloques en X y 100 bloques en Y
-
-	MatrixMulKernel<<< dimGrid, dimBlock >>>(d_A, d_B, d_C, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
-	cudaMemcpy( CK,d_C, size, cudaMemcpyDeviceToHost);
-
   	t2 = clock() - t2;
 
-  	printf ("\nTiempo desde la GPU: (%f seconds).\n",((float)t2)/CLOCKS_PER_SEC);
+  	clock_t t3;
+  	t3 = clock();
+	MatrixMulKernel<<< dimGrid, dimBlock >>>(d_A, d_B, d_C, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
+	cudaMemcpy( CK,d_C, size, cudaMemcpyDeviceToHost);
+	t3 = clock() - t3;
+
+  	clock_t t4;
+  	t4 = clock();
+  	MatrixMulKernelShared<<< dimGrid, dimBlock >>>(d_A, d_B, d_CKS, n);												//ejecuta el kernel ,,n-> numero de hilos por block, max 1024
+	cudaMemcpy( CKS,d_CKS, size, cudaMemcpyDeviceToHost);
+  	t4 = clock() - t4;
+
+  	printf ("\nTiempo desde la GPU: (%f seconds).\n",((float)(t2+t3))/CLOCKS_PER_SEC);
+  	printf ("\nTiempo desde la GPU con memoria compartida: (%f seconds).\n",((float)(t2+t4))/CLOCKS_PER_SEC);
 
 	cudaFree(d_A);																			//libera memoria del dispositivo
 	cudaFree(d_B);
 	cudaFree(d_C);
+	cudaFree(d_CKS);
 
 }
 
@@ -116,16 +126,18 @@ int main(){
 	int * A;
 	int * B;
 	int * C;
-  	int * CK;
+  	int * CK;  	
+  	int * CKS;
+
   	int	n=TAM;
   	int filas=n;
   	int columnas=n;
 
 	A = (int*)malloc( filas*columnas*sizeof(int) );
 	B = (int*)malloc( filas*columnas*sizeof(int) );
-	C = (int*)malloc( filas*columnas*sizeof(int) );
-	CK = (int*)malloc( filas*columnas*sizeof(int) );
-
+	C = (int*)malloc( filas*columnas*sizeof(int) );		//para resultado secuencial
+	CK = (int*)malloc( filas*columnas*sizeof(int) );	//para resultado paralelo
+	CKS = (int*)malloc( filas*columnas*sizeof(int) );	//para resultado paralelo con memoria compartida
 
 	for(int fil=0;fil<filas;fil++){
 		for(int col=0;col<columnas;col++){
@@ -136,29 +148,29 @@ int main(){
 		}
     	//printf("\n");
 	}
-  
   	//printf("\n");printf("\n");printf("\n");
   
-	//vecAddGPU(A,B,C);
   	multiplicar(A,B,C,filas,columnas);
-  	vectorAdd(A,B,CK,n);
+  	vectorAdd(A,B,CK,CKS,n);
 
   	int entre=0;
 
   	for(int fil=0;fil<filas;fil++){
 		for(int col=0;col<columnas;col++){
 			//printf("%d ",CK[fil*columnas+col]);
-			if(C[fil*columnas+col]==CK[fil*columnas+col]){
+			if(C[fil*columnas+col]==CK[fil*columnas+col] && C[fil*columnas+col]==CKS[fil*columnas+col]){
 				entre++;
 			}
 		}
 		//printf("\n");
 	}
-	printf("entre %d veces.",entre);
+	printf("Hay %d coincidencias.",entre);
 
   	free(A);
   	free(B);
   	free(C);
   	free(CK);
+  	free(CKS);
+
 	return 0;
 }
