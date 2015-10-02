@@ -136,7 +136,7 @@ int main(){
   	int * CK;  	
   	int * CKS;
 
-  	int n=3000;
+  	int n=1024;
   	int filasA=n;
   	int columnasA=n;
   
