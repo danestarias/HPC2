@@ -125,7 +125,6 @@ int main(){
 				}
 			}
   
-  printf("coincidencias -> %d ",entre);
-
+  printf("coincidencias --> %d ",entre);
 	return 0;
 }
