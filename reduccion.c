@@ -5,7 +5,7 @@
 #include <time.h>
 #define blockSize 1024
 
-#define TAM 11
+#define TAM 8*2*2*2*2*2*2*2
 
 
 
