@@ -10,20 +10,42 @@
 using namespace cv;
 
 
+
+__device__ unsigned char clamp(int value){
+    if(value < 0)
+        value = 0;
+    else
+        if(value > 255)
+            value = 255;
+    return (unsigned char)value;
+}
+
 __global__ void Union(unsigned char *Sobel_X, unsigned char *Sobel_Y, int width, int height, unsigned char *imageOutput){
     int row = blockIdx.y*blockDim.y+threadIdx.y;
     int col = blockIdx.x*blockDim.x+threadIdx.x;
-        int aux;
+    //int aux;
     if((row < height) && (col < width)){
-      aux=Sobel_X[row*width+col]+Sobel_Y[row*width+col];
-      if( aux>150){
-        imageOutput[row*width+col] = 255;
+      //aux= sqrtf( Sobel_X[row*width+col]*Sobel_X[row*width+col]+Sobel_Y[row*width+col]*Sobel_Y[row*width+col]);
+      //imageOutput[row*width+col]= clamp(Sobel_X[row*width+col]+Sobel_Y[row*width+col]);
+      imageOutput[row*width+col]= clamp(sqrtf( Sobel_X[row*width+col]*Sobel_X[row*width+col]+Sobel_Y[row*width+col]*Sobel_Y[row*width+col]) );
+      /*if(aux >= 0 || aux <= 255){
+        imageOutput[row*width+col]=aux;
       }else{
-        imageOutput[row*width+col] = 0;
-      }
-        
+        if(aux>255){
+          imageOutput[row*width+col]=255;
+        }else{
+          imageOutput[row*width+col]=0;
+        }
+      }*/
+      //imageOutput[row*width+col]= ceil(sqrtf( Sobel_X[row*width+col]*Sobel_X[row*width+col]+Sobel_Y[row*width+col]*Sobel_Y[row*width+col]));
     }
 }
+
+
+
+
+
+
 
 __global__ void Sobel(unsigned char *imageInput,int *mask, int width, int height, unsigned char *imageOutput){
     int row = blockIdx.y*blockDim.y+threadIdx.y;
@@ -62,8 +84,10 @@ __global__ void Sobel(unsigned char *imageInput,int *mask, int width, int height
         if(aux+width+2 < width*height){
             sum += mask[8]*imageInput[aux+width+2];
         }
+      
+      
 
-        imageOutput[row*width+col]=sum;
+        imageOutput[row*width+col]= clamp(sum);
     }
 }
 
@@ -106,7 +130,7 @@ int main(int argc, char **argv){
     int height = s.height;
     int size = sizeof(unsigned char)*width*height*image.channels();
     int sizeGray = sizeof(unsigned char)*width*height;
-
+        printf("\nsizeGray-> %d",width);
     
     dataRawImage = (unsigned char*)malloc(size);        //SEPARO MEMORIA PARA IMAGEN NORMAL EN CPU
     error = cudaMalloc((void**)&d_dataRawImage,size);   //SEPARO MEMORIA PARA IMAGEN NORMAL EN GPU
@@ -182,6 +206,8 @@ int main(int argc, char **argv){
     int heightG = sG.height;
     //int sizeS = sizeof(unsigned char)*widthG*heightG*gray_image.channels();
     int sizeSobel = sizeof(unsigned char)*widthG*heightG;
+  
+    printf("\nsizeSobel-> %d",widthG);
 
     int * Mask_x = (int*)malloc( 3*3*sizeof(int) ); //separo memoria en host para la mascara en X
     Mask_x[0]=-1;Mask_x[1]=0;Mask_x[2]=1;
@@ -212,7 +238,7 @@ int main(int argc, char **argv){
     //aplico filtro en x
     Sobel<<<dimGrid2,dimBlock2>>>(d_imageOutput,d_M,widthG,heightG,d_SobelOutput_X);//d_dataRawImageGray
     cudaDeviceSynchronize();
-    //cudaMemcpy(h_SobelOutput_X,d_SobelOutput_X,sizeSobel,cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_SobelOutput_X,d_SobelOutput_X,sizeSobel,cudaMemcpyDeviceToHost);
     //endGPU = clock();
 
     //aplico filtro en y
@@ -224,7 +250,7 @@ int main(int argc, char **argv){
 
 
     //union sobel_X y sobel_Y
-    Union<<<dimGrid2,dimBlock2>>>(d_SobelOutput_X,d_SobelOutput_Y,widthG,heightG,d_SobelOutput);//d_dataRawImageGray
+    Union<<<dimGrid2,dimBlock2>>>(d_SobelOutput_X,d_SobelOutput_Y,width,height,d_SobelOutput);//d_dataRawImageGray
     cudaDeviceSynchronize();
     h_SobelOutput = (unsigned char *)malloc(sizeSobel);
 
@@ -255,8 +281,7 @@ int main(int argc, char **argv){
       //Scharr( src_gray, grad_x, ddepth, 1, 0, scale, delta, BORDER_DEFAULT );
       Sobel( gray_image_opencv, grad_x, ddepth, 1, 0, 3, scale, delta, BORDER_DEFAULT );
       convertScaleAbs( grad_x, abs_grad_x );
-
-      /// Gradient Y
+            /// Gradient Y
       //Scharr( src_gray, grad_y, ddepth, 0, 1, scale, delta, BORDER_DEFAULT );
       Sobel( gray_image_opencv, grad_y, ddepth, 0, 1, 3, scale, delta, BORDER_DEFAULT );
       convertScaleAbs( grad_y, abs_grad_y );
